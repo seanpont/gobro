@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -44,48 +45,71 @@ func caller() string {
 
 // ===== COMMAND MAPPER ======================================================
 
+type FuncDesc struct {
+	Fn   func([]string)
+	Desc string
+}
+
 type CommandMap struct {
 	// CommandMap holds a map of names to functions. Useful for handling
 	// control flow in main functions writing a ton of if this else that or
 	// using flag, which I find sub-optimal
-	commandMap map[string]func([]string)
+	commandMap map[string]FuncDesc
 }
 
 func NewCommandMap(functions ...func(args []string)) (commandMap CommandMap) {
 	// Returns a new CommandMap with the functions mapped to their names.
 	// Usage: gobro.NewCommandMap(configure, doSomething).Run(os.Args)
-	commandMap.commandMap = make(map[string]func([]string))
+	commandMap.commandMap = make(map[string]FuncDesc)
 
 	for _, fn := range functions {
 		name := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
-		name = strings.Split(name, ".")[1] // main.command becomes command
-		commandMap.commandMap[name] = fn
+		name = strings.Split(name, ".")[1] // foo.command becomes command
+		commandMap.commandMap[name] = FuncDesc{Fn: fn}
 	}
 
 	return
 }
 
-func (cm CommandMap) Run(args []string) {
+func (cm *CommandMap) Add(name string, fn func([]string), desc ...string) {
+	if len(desc) > 0 {
+		cm.commandMap[name] = FuncDesc{Fn: fn, Desc: desc[0]}
+	} else {
+		cm.commandMap[name] = FuncDesc{Fn: fn}
+	}
+}
+
+func (cm *CommandMap) Commands() []string {
+	commands := make([]string, 0, len(cm.commandMap))
+	for k, _ := range cm.commandMap {
+		commands = append(commands, k)
+	}
+	sort.Strings(commands)
+	return commands
+}
+
+func (cm *CommandMap) Run(args []string) {
 	// Run the function corresponding to the first argument in args
 	// You're probably going to want to pass in os.Args
-	if len(os.Args) == 1 {
+	cmd := ""
+	options := make([]string, 0)
+	if len(args) > 1 {
+		cmd = args[1]
+		options = args[2:]
+	}
+
+	fn := cm.commandMap[cmd]
+	if fn.Fn != nil {
+		fn.Fn(options)
+	} else {
 		fmt.Printf("Usage: %s [options] <command> [<args>]\n\n", args[0])
 		fmt.Println("Available commands:")
-		for k, _ := range cm.commandMap {
-			fmt.Printf("   %s\n", k)
+		for _, k := range cm.Commands() {
+			v := cm.commandMap[k]
+			fmt.Printf("   %-10s  %-10s\n", k, v.Desc)
 		}
 		fmt.Println("")
-		os.Exit(1)
 	}
-
-	command := os.Args[1]
-	fn := cm.commandMap[command]
-	if fn == nil {
-		fmt.Fprintf(os.Stderr, "Command '%s' not found\n", command)
-		os.Exit(1)
-	}
-
-	fn(os.Args[2:])
 }
 
 func CheckArgs(args []string, numArgs int, message string, a ...interface{}) {
