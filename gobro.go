@@ -57,9 +57,10 @@ type CommandMap struct {
 	commandMap map[string]FuncDesc
 }
 
-func NewCommandMap(functions ...func(args []string)) (commandMap CommandMap) {
+func NewCommandMap(functions ...func(args []string)) (commandMap *CommandMap) {
 	// Returns a new CommandMap with the functions mapped to their names.
 	// Usage: gobro.NewCommandMap(configure, doSomething).Run(os.Args)
+	commandMap = new(CommandMap)
 	commandMap.commandMap = make(map[string]FuncDesc)
 
 	for _, fn := range functions {
