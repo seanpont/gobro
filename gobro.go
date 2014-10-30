@@ -153,3 +153,12 @@ func IndexOf(items []string, query string) int {
 func Contains(items []string, query string) bool {
 	return IndexOf(items, query) >= 0
 }
+
+// ===== PRIMITIVE UTILS =====================================================
+
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
